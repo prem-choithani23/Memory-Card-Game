@@ -1,116 +1,106 @@
-import { give_images } from './images.js'
+//  get images from images.js
+import { give_images } from "./images.js";
 
-//varaibles --init--
-let images = give_images()
-const PAIRS = 10
-const IMAGES = PAIRS * 2
-let container = document.getElementsByClassName("container")[0]
-let i, j;
-let image_tag_array = []
-let location = []
-let done = []
-let tries = 0
-let pairs_completed = 0
-let COUNTER = 0
-let clicked = []
-let clicked_image = []
+//  animation relted imports
+import { flip, unflip } from "./animation.js";
 
-//function for choosing one element from set of image indices
-function chooseOne(set) {
-    let n;
-    n = set.size
-    let rand = Math.floor(Math.random() * n)
-    let array = Array.from(set)
-    return Number.parseInt(array[rand])
+// celebration related imprts
+import { startCelebration } from "./celebration.js";
+import { showWinModal } from "./winModal.js";
+
+const PAIRS = 10;
+const container = document.querySelector(".container");
+
+let images = give_images();
+let cards = [];
+let firstCard = null;
+let secondCard = null;
+let lockBoard = false;
+let tries = 0;
+let pairsCompleted = 0;
+
+/* creating cards + initlaization*/
+
+function shuffle(array) {
+    return array.sort(() => Math.random() - 0.5);
 }
 
-for (i = 0; i < IMAGES; i++) 
-{
-    console.log('click detected ')
-    let div = document.createElement('div')
-    let image = document.createElement('img')
-    div.appendChild(image)
-    image.className = "images"
-    image.setAttribute('id', `${i}`)
-    image_tag_array.push(image)
-    image.hidden = true
+function createCards() {
+    let selectedImages = shuffle(images).slice(0, PAIRS);
+    let cardImages = shuffle([...selectedImages, ...selectedImages]);
 
-    div.addEventListener('click', () => {
+    cardImages.forEach(src => {
+        const card = document.createElement("div");
+        card.className = "card";
 
-        let x = Number.parseInt(image.id)
-        if (done.includes(x))
-            return
-        COUNTER++
-        console.log(COUNTER)
-        let src = image_tag_array[x].src
-        //index of the card clicked and src of imag of that card pushed in 2 separate arrays
-        clicked.push(x)
-        clicked_image.push(src)
+        card.innerHTML = `
+            <div class="card-inner">
+                <div class="card-face card-front"></div>
+                <div class="card-face card-back">
+                    <img src="${src}" />
+                </div>
+            </div>
+        `;
 
-        if (COUNTER == 2) {
-            let popped = clicked_image.pop()
-            let index = clicked.pop()
+        card.addEventListener("click", () => handleClick(card, src));
+        container.appendChild(card);
 
-            if (clicked_image.includes(popped)) {
-                done.push(index)
-                done.push(clicked.pop())
-                clicked_image.pop()
-                pairs_completed++
-
-            } else {
-                setTimeout(() => {
-                    image_tag_array[index].hidden = 'true'
-                    clicked_image.pop()
-                    image_tag_array[clicked.pop()].hidden = 'true'
-                }, 1000)
-
-            }
-            COUNTER = 0
-            tries++
-        }
-        else if (COUNTER != 1) {
-            COUNTER = 0
-        }
-        if (image.hidden == false)
-            image.hidden = true
-        else if (image.hidden == true)
-            image.hidden = false;
-
-        if (pairs_completed == PAIRS) {
-            console.log('YOU WIN')
-        }
-    })
-    div.className = "card"
-    container.appendChild(div)
+        cards.push({ card, src, matched: false });
+    });
 }
 
-//choosing image index number for PAIR/2 images
-let set = new Set()
-let num = images.length
+/* core logic */
 
-for (i = 0; i < num; i++) {
-    set.add(i)
+function handleClick(card, src) {
+    if (lockBoard || card === firstCard || card.classList.contains("matched"))
+        return;
+
+    flip(card);
+
+    if (!firstCard) {
+        firstCard = card;
+        return;
+    }
+
+    secondCard = card;
+    lockBoard = true;
+    tries++;
+
+    checkMatch(src);
 }
 
-for (i = 0; i < PAIRS; i++) {
-    let rand = chooseOne(set)
-    location.push(rand)
-    set.delete(rand)
-}
+function checkMatch(src) {
+    const firstSrc = firstCard.querySelector("img").src;
+    const secondSrc = secondCard.querySelector("img").src;
 
-//allocating an image on 2 random cards
-i = 0
-let n = image_tag_array.length
-let big = new Set()
-for (i = 0; i < n; i++) {
-    big.add(i)
-}
-
-for (i = 0; i < PAIRS; i++) {
-    let curr_image = images[location[i]]
-    for (j = 0; j < 2; j++) {
-        let rand = chooseOne(big)
-        image_tag_array[rand].setAttribute('src', curr_image)
-        big.delete(rand)
+    if (firstSrc === secondSrc) {
+        markMatched();
+    } else {
+        setTimeout(() => {
+            unflip(firstCard, secondCard);
+            resetTurn();
+        }, 900);
     }
 }
+
+function markMatched() {
+    firstCard.classList.add("matched");
+    secondCard.classList.add("matched");
+    pairsCompleted++;
+    resetTurn();
+
+    if (pairsCompleted === PAIRS) {
+        startCelebration();
+        showWinModal(tries);
+    }   
+
+}
+
+function resetTurn() {
+    [firstCard, secondCard] = [null, null];
+    lockBoard = false;
+}
+
+/* render cards */
+
+createCards();
